@@ -13,11 +13,11 @@
 #include <time.h>
 #include <sys/time.h>
 #include <sys/times.h>
-#include <X11/Xlib.h>
-#include <X11/Xutil.h>
-#include <X11/keysym.h>
-#include <X11/keysymdef.h>
-#include <X11/Xatom.h>
+// #include <X11/Xlib.h>
+// #include <X11/Xutil.h>
+// #include <X11/keysym.h>
+// #include <X11/keysymdef.h>
+// #include <X11/Xatom.h>
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <errno.h>

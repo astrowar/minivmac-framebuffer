@@ -24,6 +24,8 @@ char *rom_path = NULL;
 blnr g_test_mode = falseblnr;
 int g_rotate_degrees = 0;
 double g_scale_factor = 1.0;
+int g_offset_x = 0;
+int g_offset_y = 0;
 
 #if CanGetAppPath
 char *app_parent = NULL;
@@ -293,6 +295,8 @@ LOCALPROC Usage(void)
 	fprintf(stderr, "  --skip n      Skip n frames between draws\n");
 	fprintf(stderr, "  --rotate deg  Rotate output (0, 90, 180, 270)\n");
 	fprintf(stderr, "  --scale f     Scale factor (e.g., 1.15)\n");
+	fprintf(stderr, "  --offset-x n  Horizontal offset in pixels (positive = right)\n");
+	fprintf(stderr, "  --offset-y n  Vertical offset in pixels (positive = down)\n");
 	fprintf(stderr, "  -h            Show this help\n");
 	fprintf(stderr, "  --test        Run in test mode\n");
 }
@@ -386,6 +390,44 @@ int main(int argc, char *argv[])
 				}
 
 				g_scale_factor = parsed;
+				continue;
+			} else if (strcmp(argv[i], "--offset-x") == 0) {
+				long parsed;
+				char *endp;
+
+				if (++i >= argc) {
+					Usage();
+					return 1;
+				}
+
+				errno = 0;
+				parsed = strtol(argv[i], &endp, 10);
+				if ((errno != 0) || (endp == argv[i]) || (*endp != '\0')) {
+					fprintf(stderr, "OSGLUFB: invalid --offset-x value: %s\n", argv[i]);
+					Usage();
+					return 1;
+				}
+
+				g_offset_x = (int)parsed;
+				continue;
+			} else if (strcmp(argv[i], "--offset-y") == 0) {
+				long parsed;
+				char *endp;
+
+				if (++i >= argc) {
+					Usage();
+					return 1;
+				}
+
+				errno = 0;
+				parsed = strtol(argv[i], &endp, 10);
+				if ((errno != 0) || (endp == argv[i]) || (*endp != '\0')) {
+					fprintf(stderr, "OSGLUFB: invalid --offset-y value: %s\n", argv[i]);
+					Usage();
+					return 1;
+				}
+
+				g_offset_y = (int)parsed;
 				continue;
 			} else if (strcmp(argv[i], "--snapshot") == 0) {
 				if (++i >= argc) {

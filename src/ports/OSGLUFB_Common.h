@@ -104,6 +104,8 @@ extern char *n_arg;
 extern char *rom_path;
 extern blnr g_test_mode;
 extern int g_rotate_degrees;
+extern int g_offset_x;
+extern int g_offset_y;
 
 #if CanGetAppPath
 extern char *app_parent;

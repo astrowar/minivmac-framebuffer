@@ -8,6 +8,8 @@
 
 /* Forward declaration of global scale factor from Main.c */
 extern double g_scale_factor;
+extern int g_offset_x;
+extern int g_offset_y;
 
 /* Framebuffer variables */
 LOCALVAR int fb_fd = -1;
@@ -17,7 +19,13 @@ LOCALVAR int fb_height = 0;
 LOCALVAR int fb_bps = 0;
 LOCALVAR struct fb_var_screeninfo fb_var;
 LOCALVAR struct fb_fix_screeninfo fb_fix;
-LOCALVAR blnr fb_center_bg_ready = falseblnr;
+
+/* Layout tracking: background is cleared only when these change */
+LOCALVAR int fb_layout_offset_x = 0x7FFFFFFF;
+LOCALVAR int fb_layout_offset_y = 0x7FFFFFFF;
+LOCALVAR int fb_layout_scaled_w = 0;
+LOCALVAR int fb_layout_scaled_h = 0;
+LOCALVAR blnr fb_layout_center = falseblnr;
 
 /* Test mode framebuffer buffer - defined here for module-local access */
 LOCALVAR ui3p test_fb_buffer = NULL;
@@ -111,7 +119,7 @@ GLOBALOSGLUFUNC blnr fb_init(void)
 		}
 		fb_fix.line_length = fb_width * 4;
 		fb_buffer = test_fb_buffer;
-		fb_center_bg_ready = falseblnr;
+		fb_layout_offset_x = 0x7FFFFFFF; /* force clear on first frame */
 		fprintf(stderr, "OSGLUFB: Test buffer allocated at %p\n", (void*)test_fb_buffer);
 		return trueblnr;
 	}
@@ -153,7 +161,7 @@ GLOBALOSGLUFUNC blnr fb_init(void)
 		return falseblnr;
 	}
 
-	fb_center_bg_ready = falseblnr;
+	fb_layout_offset_x = 0x7FFFFFFF; /* force clear on first frame */
 
 	return trueblnr;
 }
@@ -165,12 +173,12 @@ GLOBALOSGLUPROC fb_shutdown(void)
 	if (g_test_mode && test_fb_buffer != NULL) {
 		free(test_fb_buffer);
 		test_fb_buffer = NULL;
-		fb_center_bg_ready = falseblnr;
 	} else if (fb_buffer != NULL) {
 		munmap(fb_buffer, fb_fix.smem_len);
 		fb_buffer = NULL;
-		fb_center_bg_ready = falseblnr;
 	}
+	fb_layout_offset_x = 0x7FFFFFFF; /* force re-clear on next open */
+	fb_layout_offset_y = 0x7FFFFFFF;
 	if (fb_fd >= 0) {
 		close(fb_fd);
 		fb_fd = -1;
@@ -331,14 +339,26 @@ LOCALPROC fb_draw_to_buffer(void)
 		center_no_scale = (fb_width >= scaled_width) && (fb_height >= scaled_height);
 
 		if (center_no_scale) {
-			dst_x0 = (fb_width - scaled_width) / 2;
-			dst_y0 = (fb_height - scaled_height) / 2;
-			if (!fb_center_bg_ready) {
-				memset(fb_buffer, 0x00, fb_fix.line_length * fb_height);
-				fb_center_bg_ready = trueblnr;
-			}
+			dst_x0 = (fb_width - scaled_width) / 2 + g_offset_x;
+			dst_y0 = (fb_height - scaled_height) / 2 + g_offset_y;
 		} else {
-			fb_center_bg_ready = falseblnr;
+			dst_x0 = g_offset_x;
+			dst_y0 = g_offset_y;
+		}
+
+		/* Clear background only when layout changes, never every frame */
+		if ((fb_layout_offset_x != g_offset_x)
+			|| (fb_layout_offset_y != g_offset_y)
+			|| (fb_layout_scaled_w != scaled_width)
+			|| (fb_layout_scaled_h != scaled_height)
+			|| (fb_layout_center != center_no_scale))
+		{
+			memset(fb_buffer, 0x00, fb_fix.line_length * fb_height);
+			fb_layout_offset_x = g_offset_x;
+			fb_layout_offset_y = g_offset_y;
+			fb_layout_scaled_w = scaled_width;
+			fb_layout_scaled_h = scaled_height;
+			fb_layout_center = center_no_scale;
 		}
 
 		switch (fb_bps) {
@@ -350,12 +370,14 @@ LOCALPROC fb_draw_to_buffer(void)
 					for (si4b y = 0; y < scaled_height; ++y) {
 						int src_y = (y * rot_height) / scaled_height;
 						int dst_y = y + dst_y0;
+						if (dst_y < 0 || dst_y >= fb_height) { continue; }
 
 						for (si4b x = 0; x < scaled_width; ++x) {
 							int src_x = (x * rot_width) / scaled_width;
 							int src_bit = MonoSourceBitAt(
 								draw_buf, src_line_bytes, src_width, src_height, src_x, src_y);
 							int dst_x = x + dst_x0;
+							if (dst_x < 0 || dst_x >= fb_width) { continue; }
 
 							fb_ptr[dst_y * fb_pitch + dst_x] = src_bit ? 0x00000000 : 0x00FFFFFF;
 						}
@@ -363,14 +385,18 @@ LOCALPROC fb_draw_to_buffer(void)
 				} else {
 					for (si4b y = 0; y < fb_height; y++) {
 						int src_y = (y * rot_height) / fb_height;
+						int dst_y = y + dst_y0;
+						if (dst_y < 0 || dst_y >= fb_height) { continue; }
 
 						for (si4b x = 0; x < fb_width; x++) {
 							int src_x = (x * rot_width) / fb_width;
 							int src_bit = MonoSourceBitAt(
 								draw_buf, src_line_bytes, src_width, src_height,
 								src_x, src_y);
+							int dst_x = x + dst_x0;
+							if (dst_x < 0 || dst_x >= fb_width) { continue; }
 
-							fb_ptr[y * fb_pitch + x] = src_bit ? 0x00000000 : 0x00FFFFFF;
+							fb_ptr[dst_y * fb_pitch + dst_x] = src_bit ? 0x00000000 : 0x00FFFFFF;
 						}
 					}
 				}
@@ -384,13 +410,16 @@ LOCALPROC fb_draw_to_buffer(void)
 				if (center_no_scale) {
 					for (si4b y = 0; y < scaled_height; ++y) {
 						int src_y = (y * rot_height) / scaled_height;
-						ui8 *row_ptr = fb_ptr + (y + dst_y0) * fb_pitch;
+						int dst_y = y + dst_y0;
+						if (dst_y < 0 || dst_y >= fb_height) { continue; }
+						ui8 *row_ptr = fb_ptr + dst_y * fb_pitch;
 
 						for (si4b x = 0; x < scaled_width; ++x) {
 							int src_x = (x * rot_width) / scaled_width;
 							int src_bit = MonoSourceBitAt(
 								draw_buf, src_line_bytes, src_width, src_height, src_x, src_y);
 							int dst_x = x + dst_x0;
+							if (dst_x < 0 || dst_x >= fb_width) { continue; }
 
 							row_ptr[dst_x * 3 + 0] = src_bit ? 0x00 : 0xFF;
 							row_ptr[dst_x * 3 + 1] = src_bit ? 0x00 : 0xFF;
@@ -400,17 +429,21 @@ LOCALPROC fb_draw_to_buffer(void)
 				} else {
 					for (si4b y = 0; y < fb_height; y++) {
 						int src_y = (y * rot_height) / fb_height;
-						ui8 *row_ptr = fb_ptr + y * fb_pitch;
+						int dst_y = y + dst_y0;
+						if (dst_y < 0 || dst_y >= fb_height) { continue; }
+						ui8 *row_ptr = fb_ptr + dst_y * fb_pitch;
 
 						for (si4b x = 0; x < fb_width; x++) {
 							int src_x = (x * rot_width) / fb_width;
 							int src_bit = MonoSourceBitAt(
 								draw_buf, src_line_bytes, src_width, src_height,
 								src_x, src_y);
+							int dst_x = x + dst_x0;
+							if (dst_x < 0 || dst_x >= fb_width) { continue; }
 
-							row_ptr[x * 3 + 0] = src_bit ? 0x00 : 0xFF;
-							row_ptr[x * 3 + 1] = src_bit ? 0x00 : 0xFF;
-							row_ptr[x * 3 + 2] = src_bit ? 0x00 : 0xFF;
+							row_ptr[dst_x * 3 + 0] = src_bit ? 0x00 : 0xFF;
+							row_ptr[dst_x * 3 + 1] = src_bit ? 0x00 : 0xFF;
+							row_ptr[dst_x * 3 + 2] = src_bit ? 0x00 : 0xFF;
 						}
 					}
 				}
@@ -425,6 +458,7 @@ LOCALPROC fb_draw_to_buffer(void)
 					for (si4b y = 0; y < scaled_height; ++y) {
 						int src_y = (y * rot_height) / scaled_height;
 						int dst_y = y + dst_y0;
+						if (dst_y < 0 || dst_y >= fb_height) { continue; }
 
 						for (si4b x = 0; x < scaled_width; ++x) {
 							int src_x = (x * rot_width) / scaled_width;
@@ -432,6 +466,7 @@ LOCALPROC fb_draw_to_buffer(void)
 								draw_buf, src_line_bytes, src_width, src_height, src_x, src_y);
 							ui16 color = src_bit ? 0x0000 : 0xFFFF;
 							int dst_x = x + dst_x0;
+							if (dst_x < 0 || dst_x >= fb_width) { continue; }
 
 							fb_ptr[dst_y * fb_pitch + dst_x] = color;
 						}
@@ -439,15 +474,19 @@ LOCALPROC fb_draw_to_buffer(void)
 				} else {
 					for (si4b y = 0; y < fb_height; y++) {
 						int src_y = (y * rot_height) / fb_height;
+						int dst_y = y + dst_y0;
+						if (dst_y < 0 || dst_y >= fb_height) { continue; }
 
 						for (si4b x = 0; x < fb_width; x++) {
 							int src_x = (x * rot_width) / fb_width;
 							int src_bit = MonoSourceBitAt(
 								draw_buf, src_line_bytes, src_width, src_height,
 								src_x, src_y);
-
 							ui16 color = src_bit ? 0x0000 : 0xFFFF;
-							fb_ptr[y * fb_pitch + x] = color;
+							int dst_x = x + dst_x0;
+							if (dst_x < 0 || dst_x >= fb_width) { continue; }
+
+							fb_ptr[dst_y * fb_pitch + dst_x] = color;
 						}
 					}
 				}
@@ -462,6 +501,7 @@ LOCALPROC fb_draw_to_buffer(void)
 					for (si4b y = 0; y < scaled_height; ++y) {
 						int src_y = (y * rot_height) / scaled_height;
 						int dst_y = y + dst_y0;
+						if (dst_y < 0 || dst_y >= fb_height) { continue; }
 
 						for (si4b x = 0; x < scaled_width; ++x) {
 							int src_x = (x * rot_width) / scaled_width;
@@ -469,6 +509,7 @@ LOCALPROC fb_draw_to_buffer(void)
 								draw_buf, src_line_bytes, src_width, src_height, src_x, src_y);
 							ui16 color = src_bit ? 0x0000 : 0x7FFF;
 							int dst_x = x + dst_x0;
+							if (dst_x < 0 || dst_x >= fb_width) { continue; }
 
 							fb_ptr[dst_y * fb_pitch + dst_x] = color;
 						}
@@ -476,15 +517,19 @@ LOCALPROC fb_draw_to_buffer(void)
 				} else {
 					for (si4b y = 0; y < fb_height; y++) {
 						int src_y = (y * rot_height) / fb_height;
+						int dst_y = y + dst_y0;
+						if (dst_y < 0 || dst_y >= fb_height) { continue; }
 
 						for (si4b x = 0; x < fb_width; x++) {
 							int src_x = (x * rot_width) / fb_width;
 							int src_bit = MonoSourceBitAt(
 								draw_buf, src_line_bytes, src_width, src_height,
 								src_x, src_y);
-
 							ui16 color = src_bit ? 0x0000 : 0x7FFF;
-							fb_ptr[y * fb_pitch + x] = color;
+							int dst_x = x + dst_x0;
+							if (dst_x < 0 || dst_x >= fb_width) { continue; }
+
+							fb_ptr[dst_y * fb_pitch + dst_x] = color;
 						}
 					}
 				}
