@@ -22,6 +22,10 @@ cmake-build-*/
 *.swo
 *~
 
+# All hidden directories
+.*
+!/.gitignore
+
 # OS generated files
 .DS_Store
 Thumbs.db
