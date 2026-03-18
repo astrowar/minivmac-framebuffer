@@ -26,6 +26,9 @@ cmake-build-*/
 .*
 !/.gitignore
 
+# Build output
+bld/
+
 # OS generated files
 .DS_Store
 Thumbs.db
