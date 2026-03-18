@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(make 2>&1 | head -50)",
+      "Bash(make 2>&1 | tail -20)",
+      "Bash(make 2>&1)",
+      "Bash(cd /home/eraldomr/dev/vmac/framebuffer/event_reader && make)",
+      "Bash(make)",
+      "Bash(make && sudo ./event_reader)",
+      "Bash(./event_reader)",
+      "Read(//sys/devices/pci0000:00/0000:00:14.0/usb1/1-9/1-9:1.0/0003:2DC8:5200.00B6/input/input155/capabilities/**)",
+      "Bash(python3 -c \"print\\(hex\\(0x17\\)\\)\" && python3 -c \"print\\(0x17 & 0x01\\)\")",
+      "Bash(make 2>&1 && ./input_reader 2>&1)",
+      "Bash(make 2>&1 && sudo ./input_reader 2>&1)",
+      "Bash(make clean:*)",
+      "Bash(git init:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git remote:*)",
+      "Bash(git branch:*)",
+      "Bash(git push:*)",
+      "Bash(git pull:*)"
+    ]
+  }
+}
