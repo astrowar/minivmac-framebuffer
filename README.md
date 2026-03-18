@@ -1,6 +1,6 @@
 # minivmac-framebuffer
 
-MiniVmac framebuffer port for Linux - Mac II/Plus emulator with direct framebuffer output.
+MiniVmac framebuffer port for Linux - Mac Classic  emulator with direct framebuffer output.
 
 ## Building
 
@@ -37,7 +37,7 @@ make
 ./minivmac
 
 # Specify ROM and disk image
-./minivmac -r rom/MacII.rom -d local/
+./minivmac -r rom/MacPlus.rom -d local/
 
 # Rotate 90 degrees and scale
 ./minivmac --rotate 90 --scale 1.5
