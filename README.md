@@ -48,7 +48,7 @@ make
 # Skip 2 frames between draws (reduce CPU usage)
 ./minivmac --skip 2
 
-# Test mode (no framebuffer, prints ASCII art to console)
+# Test mode (no framebuffer , write an ppm of screen)
 ./minivmac --test
 ```
 
