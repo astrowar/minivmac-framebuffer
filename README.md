@@ -56,7 +56,7 @@ make
 
 - Linux with framebuffer support (`/dev/fb0`)
 - GCC compiler
-- X11 development headers (for compilation)
+ 
 
 ## License
 
