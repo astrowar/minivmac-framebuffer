@@ -26,6 +26,8 @@ int g_rotate_degrees = 0;
 double g_scale_factor = 1.0;
 int g_offset_x = 0;
 int g_offset_y = 0;
+blnr g_fill_enabled = falseblnr;
+ui32 g_fill_color = FILL_COLOR_ARGB;
 
 #if CanGetAppPath
 char *app_parent = NULL;
@@ -297,6 +299,7 @@ LOCALPROC Usage(void)
 	fprintf(stderr, "  --scale f     Scale factor (e.g., 1.15)\n");
 	fprintf(stderr, "  --offset-x n  Horizontal offset in pixels (positive = right)\n");
 	fprintf(stderr, "  --offset-y n  Vertical offset in pixels (positive = down)\n");
+	fprintf(stderr, "  --fill        Fill area outside emulated screen with color (default: red)\n");
 	fprintf(stderr, "  -h            Show this help\n");
 	fprintf(stderr, "  --test        Run in test mode\n");
 }
@@ -435,6 +438,22 @@ int main(int argc, char *argv[])
 					return 1;
 				}
 				test_snapshot_path = argv[i];
+				continue;
+			} else if (strcmp(argv[i], "--fill") == 0) {
+				g_fill_enabled = trueblnr;
+				continue;
+			} else if (strcmp(argv[i], "--fill-color") == 0) {
+				if (++i >= argc) {
+					Usage();
+					return 1;
+				}
+				long color = strtol(argv[i], NULL, 0);
+				if (color < 0 || color > 0xFFFFFFFF) {
+					fprintf(stderr, "OSGLUFB: invalid fill color: %s\n", argv[i]);
+					Usage();
+					return 1;
+				}
+				g_fill_color = (ui32)color;
 				continue;
 			}
 

@@ -52,6 +52,10 @@ make
 ./minivmac --test
 ```
 
+ use fill to adjust the scale , offset-x offset_y.
+
+
+
 ## Requirements
 
 - Linux with framebuffer support (`/dev/fb0`)

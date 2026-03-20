@@ -41,6 +41,21 @@ typedef unsigned int ui32;
 #define TEST_FB_WIDTH 640
 #define TEST_FB_HEIGHT  480
 
+/* Fill color for area outside emulated screen (ARGB format, default blue) */
+#define FILL_COLOR_ARGB 0xFF0000FF
+
+/* Environment variables shared by split modules */
+extern char *d_arg;
+extern char *n_arg;
+extern char *rom_path;
+extern blnr g_test_mode;
+extern int g_rotate_degrees;
+extern double g_scale_factor;
+extern int g_offset_x;
+extern int g_offset_y;
+extern blnr g_fill_enabled;
+extern ui32 g_fill_color;
+
 /* Forward declaration for GetCurDrawBuff */
 GLOBALOSGLUFUNC ui3p GetCurDrawBuff(void);
 
@@ -104,8 +119,11 @@ extern char *n_arg;
 extern char *rom_path;
 extern blnr g_test_mode;
 extern int g_rotate_degrees;
+extern double g_scale_factor;
 extern int g_offset_x;
 extern int g_offset_y;
+extern blnr g_fill_enabled;
+extern ui32 g_fill_color;
 
 #if CanGetAppPath
 extern char *app_parent;

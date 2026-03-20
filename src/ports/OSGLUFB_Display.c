@@ -10,6 +10,8 @@
 extern double g_scale_factor;
 extern int g_offset_x;
 extern int g_offset_y;
+extern blnr g_fill_enabled;
+extern ui32 g_fill_color;
 
 /* Framebuffer variables */
 LOCALVAR int fb_fd = -1;
@@ -26,6 +28,8 @@ LOCALVAR int fb_layout_offset_y = 0x7FFFFFFF;
 LOCALVAR int fb_layout_scaled_w = 0;
 LOCALVAR int fb_layout_scaled_h = 0;
 LOCALVAR blnr fb_layout_center = falseblnr;
+LOCALVAR ui32 fb_layout_fill_color = 0;
+LOCALVAR blnr fb_layout_fill_enabled = falseblnr;
 
 /* Test mode framebuffer buffer - defined here for module-local access */
 LOCALVAR ui3p test_fb_buffer = NULL;
@@ -124,10 +128,18 @@ GLOBALOSGLUFUNC blnr fb_init(void)
 		return trueblnr;
 	}
 
-	fb_fd = open("/dev/fb0", O_RDWR);
-	if (fb_fd < 0) {
-		fprintf(stderr, "OSGLUFB: Cannot open /dev/fb0\n");
-		return falseblnr;
+	/* Try to open /dev/fb0 with retries (100ms delay, up to 10 seconds) */
+	int retry_count = 0;
+	const int max_retries = 100; /* 100 * 100ms = 10 seconds */
+	while ((fb_fd = open("/dev/fb0", O_RDWR)) < 0) {
+		retry_count++;
+		if (retry_count >= max_retries) {
+			fprintf(stderr, "OSGLUFB: Cannot open /dev/fb0 after %d retries\n", max_retries);
+			return falseblnr;
+		}
+		fprintf(stderr, "OSGLUFB: Cannot open /dev/fb0 (attempt %d/%d), retrying in 100ms...\n",
+			retry_count, max_retries);
+		usleep(100000); /* 100ms */
 	}
 
 	if (ioctl(fb_fd, FBIOGET_VSCREENINFO, &fb_var) < 0) {
@@ -251,6 +263,56 @@ LOCALPROC fb_test_render(void)
 	fflush(stdout);
 }
 
+/* --- Fill framebuffer with color (for fill mode) --- */
+
+LOCALPROC fb_fill_with_color(ui32 color)
+{
+	if (fb_buffer == NULL) {
+		return;
+	}
+
+	switch (fb_bps) {
+		case 32: {
+			ui32 *fb_ptr = (ui32 *)fb_buffer;
+			int total_pixels = fb_width * fb_height;
+			for (int i = 0; i < total_pixels; i++) {
+				fb_ptr[i] = color;
+			}
+			break;
+		}
+		case 24: {
+			ui8 *fb_ptr = (ui8 *)fb_buffer;
+			int total_pixels = fb_width * fb_height;
+			for (int i = 0; i < total_pixels; i++) {
+				fb_ptr[i * 3 + 0] = (color >> 16) & 0xFF;
+				fb_ptr[i * 3 + 1] = (color >> 8) & 0xFF;
+				fb_ptr[i * 3 + 2] = color & 0xFF;
+			}
+			break;
+		}
+		case 16: {
+			ui16 *fb_ptr = (ui16 *)fb_buffer;
+			int total_pixels = fb_width * fb_height;
+			for (int i = 0; i < total_pixels; i++) {
+				fb_ptr[i] = ((color >> 10) & 0x1F) << 11 |
+					((color >> 5) & 0x1F) << 5 |
+					(color & 0x1F);
+			}
+			break;
+		}
+		case 15: {
+			ui16 *fb_ptr = (ui16 *)fb_buffer;
+			int total_pixels = fb_width * fb_height;
+			for (int i = 0; i < total_pixels; i++) {
+				fb_ptr[i] = ((color >> 10) & 0x1F) << 10 |
+					((color >> 5) & 0x1F) << 5 |
+					(color & 0x1F);
+			}
+			break;
+		}
+	}
+}
+
 /* --- Internal: draw to buffer (common code) --- */
 
 LOCALPROC fb_draw_to_buffer(void)
@@ -264,6 +326,13 @@ LOCALPROC fb_draw_to_buffer(void)
 		/* Screen buffer not available - draw blank screen */
 		memset(fb_buffer, 0xFF, fb_width * fb_height * 4);
 		return;
+	}
+
+	/* Fill background with fill color if enabled */
+	if (g_fill_enabled) {
+		fb_fill_with_color(g_fill_color);
+	} else {
+		memset(fb_buffer, 0x00, fb_fix.line_length * fb_height);
 	}
 
 #if 0 != vMacScreenDepth
@@ -344,21 +413,6 @@ LOCALPROC fb_draw_to_buffer(void)
 		} else {
 			dst_x0 = g_offset_x;
 			dst_y0 = g_offset_y;
-		}
-
-		/* Clear background only when layout changes, never every frame */
-		if ((fb_layout_offset_x != g_offset_x)
-			|| (fb_layout_offset_y != g_offset_y)
-			|| (fb_layout_scaled_w != scaled_width)
-			|| (fb_layout_scaled_h != scaled_height)
-			|| (fb_layout_center != center_no_scale))
-		{
-			memset(fb_buffer, 0x00, fb_fix.line_length * fb_height);
-			fb_layout_offset_x = g_offset_x;
-			fb_layout_offset_y = g_offset_y;
-			fb_layout_scaled_w = scaled_width;
-			fb_layout_scaled_h = scaled_height;
-			fb_layout_center = center_no_scale;
 		}
 
 		switch (fb_bps) {
