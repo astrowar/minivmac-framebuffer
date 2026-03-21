@@ -125,6 +125,11 @@ extern int g_offset_y;
 extern blnr g_fill_enabled;
 extern ui32 g_fill_color;
 
+/* --- Logging to both stderr and file --- */
+GLOBALOSGLUPROC log_init(const char *log_path);
+GLOBALOSGLUPROC log_close(void);
+GLOBALOSGLUPROC log_printf(const char *fmt, ...);
+
 #if CanGetAppPath
 extern char *app_parent;
 extern char *pref_dir;

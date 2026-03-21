@@ -75,7 +75,7 @@ LOCALPROC QueueKeyEvent(ui3r mac_key, blnr is_down)
 {
 	if (OSGLUFB_PostKey(mac_key, is_down)) {
 	} else if (mouse_log_enabled) {
-		fprintf(stderr, "OSGLUFB: key event dropped (queue full), key=%u down=%u\n",
+		log_printf("OSGLUFB: key event dropped (queue full), key=%u down=%u\n",
 			(unsigned int)mac_key, (unsigned int)is_down);
 	}
 }
@@ -88,13 +88,13 @@ LOCALFUNC blnr QueueMouseButton(blnr down)
 
 	if (OSGLUFB_PostMouseButton(down)) {
 		if (mouse_log_enabled) {
-			fprintf(stderr, "OSGLUFB: mouse button event queued: %s\n",
+			log_printf("OSGLUFB: mouse button event queued: %s\n",
 				down ? "press" : "release");
 		}
 		host_mouse_button_down = down;
 		return trueblnr;
 	} else if (mouse_log_enabled) {
-		fprintf(stderr, "OSGLUFB: mouse button event dropped (queue full): %s\n",
+		log_printf("OSGLUFB: mouse button event dropped (queue full): %s\n",
 			down ? "press" : "release");
 	}
 
@@ -106,7 +106,7 @@ LOCALFUNC blnr QueueMouseDelta(si4r dh, si4r dv)
 	if ((dh != 0) || (dv != 0)) {
 		if (OSGLUFB_PostMouseDelta(dh, dv)) {
 			if (mouse_log_enabled) {
-				fprintf(stderr, "OSGLUFB: mouse move event queued: dx=%ld dy=%ld\n",
+				log_printf("OSGLUFB: mouse move event queued: dx=%ld dy=%ld\n",
 					(long)dh, (long)dv);
 			}
 			return trueblnr;
@@ -146,7 +146,7 @@ LOCALPROC KbdRescan(void)
 
 	for (i = 0; i < kbd_reader.count; ++i) {
 		if (!KbdPathExists(old_paths, old_count, kbd_reader.keyboards[i].path)) {
-			fprintf(stderr, "OSGLUFB: teclado adicionado: %s (%s)\n",
+			log_printf("OSGLUFB: teclado adicionado: %s (%s)\n",
 				kbd_reader.keyboards[i].name[0] ? kbd_reader.keyboards[i].name : "sem nome",
 				kbd_reader.keyboards[i].path);
 		}
@@ -154,7 +154,7 @@ LOCALPROC KbdRescan(void)
 
 	for (i = 0; i < old_count; ++i) {
 		if (!KbdReaderHasPath(&kbd_reader, old_paths[i])) {
-			fprintf(stderr, "OSGLUFB: teclado removido: %s\n", old_paths[i]);
+			log_printf("OSGLUFB: teclado removido: %s\n", old_paths[i]);
 		}
 	}
 }
@@ -183,7 +183,7 @@ GLOBALOSGLUPROC setup_kbd_raw(void)
 
 	/* Initialize keyboard device reader using dev/input */
 	if (input_reader_init(&kbd_reader) < 0) {
-		fprintf(stderr, "OSGLUFB: nenhum teclado detectado no init; hotplug ativo\n");
+		log_printf("OSGLUFB: nenhum teclado detectado no init; hotplug ativo\n");
 	}
 	kbd_raw_mode = trueblnr;
 	kbd_last_scan_time = 0;
@@ -332,7 +332,7 @@ GLOBALOSGLUPROC fb_poll_input(void)
 	if (key_result > 0) {
 		/* F10: force quit */
 		if (key_code == KEY_F10) {
-			fprintf(stderr, "force quit\n");
+			log_printf("force quit\n");
 			fflush(stderr);
 			exit(0);
 		}
@@ -376,7 +376,7 @@ GLOBALOSGLUPROC fb_poll_input(void)
 					if (mouse_log_enabled && (dx == 0) && (dy == 0)
 						&& (left_down == host_mouse_button_down))
 					{
-						fprintf(stderr, "OSGLUFB: mouse noop packet\n");
+						log_printf("OSGLUFB: mouse noop packet\n");
 					}
 
 					mouse_acc_dx += (si4r)dx;
@@ -388,7 +388,7 @@ GLOBALOSGLUPROC fb_poll_input(void)
 			}
 		}
 		if ((n < 0) && (errno != EAGAIN) && (errno != EWOULDBLOCK)) {
-			fprintf(stderr, "OSGLUFB: Mouse read error: %s\n", strerror(errno));
+			log_printf("OSGLUFB: Mouse read error: %s\n", strerror(errno));
 		}
 
 		if ((mouse_acc_dx != 0) || (mouse_acc_dy != 0)) {

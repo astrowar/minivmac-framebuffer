@@ -4,6 +4,7 @@
 #include <signal.h>
 #include <linux/input.h>
 #include "input_reader.h"
+#include "OSGLUFB_Common.h"
 
 static const char* get_key_name(uint16_t code) {
     switch (code) {
@@ -95,7 +96,7 @@ int main(int argc, char *argv[]) {
 
     printf("Initializing input reader...\n");
     if (input_reader_init(&reader) < 0) {
-        fprintf(stderr, "No keyboard devices found!\n");
+        log_printf(stderr, "No keyboard devices found!\n");
         return 1;
     }
 
@@ -116,7 +117,7 @@ int main(int argc, char *argv[]) {
                 break;
             }
             const char *name = get_key_name(key_code);
-            printf("%s\n", name ? name : "UNKNOWN");
+            log_printf("%s\n", name ? name : "UNKNOWN");
             fflush(stdout);
         }
     }

@@ -30,6 +30,7 @@ LOCALVAR int fb_layout_scaled_h = 0;
 LOCALVAR blnr fb_layout_center = falseblnr;
 LOCALVAR ui32 fb_layout_fill_color = 0;
 LOCALVAR blnr fb_layout_fill_enabled = falseblnr;
+LOCALVAR blnr fb_first_draw = trueblnr; /* Force clear on first frame */
 
 /* Test mode framebuffer buffer - defined here for module-local access */
 LOCALVAR ui3p test_fb_buffer = NULL;
@@ -111,39 +112,53 @@ GLOBALOSGLUFUNC blnr fb_init(void)
 {
 	if (g_test_mode) {
 		/* Test mode: use memory buffer */
-		fprintf(stderr, "OSGLUFB: Test mode - using %dx%d memory buffer\n",
+		log_printf("OSGLUFB: Test mode - using %dx%d memory buffer\n",
 			TEST_FB_WIDTH, TEST_FB_HEIGHT);
 		fb_width = TEST_FB_WIDTH;
 		fb_height = TEST_FB_HEIGHT;
 		fb_bps = 32;
 		test_fb_buffer = (ui3p)malloc(fb_width * fb_height * 4);
 		if (test_fb_buffer == NULL) {
-			fprintf(stderr, "OSGLUFB: Failed to allocate test buffer\n");
+			log_printf("OSGLUFB: Failed to allocate test buffer\n");
 			return falseblnr;
 		}
 		fb_fix.line_length = fb_width * 4;
 		fb_buffer = test_fb_buffer;
 		fb_layout_offset_x = 0x7FFFFFFF; /* force clear on first frame */
-		fprintf(stderr, "OSGLUFB: Test buffer allocated at %p\n", (void*)test_fb_buffer);
+		log_printf("OSGLUFB: Test buffer allocated at %p\n", (void*)test_fb_buffer);
 		return trueblnr;
 	}
 
-	/* Try to open /dev/fb0 with retries (100ms delay, up to 10 seconds) */
+	/* Try to open /dev/fb0 with retries (10ms delay, up to 10 seconds) */
 	int retry_count = 0;
-	const int max_retries = 100; /* 100 * 100ms = 10 seconds */
+	const int max_retries = 1000; /* 1000 * 10ms = 10 second */
 	while ((fb_fd = open("/dev/fb0", O_RDWR)) < 0) {
-		retry_count++;
-		if (retry_count >= max_retries) {
-			fprintf(stderr, "OSGLUFB: Cannot open /dev/fb0 after %d retries\n", max_retries);
+		/* If device not found, fail immediately */
+		if (errno == ENOENT) {
+			log_printf("OSGLUFB: /dev/fb0 not found\n");
 			return falseblnr;
 		}
-		fprintf(stderr, "OSGLUFB: Cannot open /dev/fb0 (attempt %d/%d), retrying in 100ms...\n",
-			retry_count, max_retries);
-		usleep(100000); /* 100ms */
+		retry_count++;
+		if (retry_count >= max_retries) {
+			if (errno == EACCES) {
+				//log_printf("OSGLUFB: Permission denied accessing /dev/fb0 after %d retries\n", max_retries);
+				//log_printf("Make sure you are running as root or have appropriate permissions.\n");
+			} else {
+				log_printf("OSGLUFB: Cannot open /dev/fb0 after %d retries: %s\n", max_retries, strerror(errno));
+			}
+			return falseblnr;
+		}
+		if (errno == EACCES) {
+			log_printf("OSGLUFB: Permission denied (attempt %d/%d), retrying...\n", retry_count, max_retries);
+		} else {
+			log_printf("OSGLUFB: Cannot open /dev/fb0 (attempt %d/%d), retrying... (%s)\n",
+				retry_count, max_retries, strerror(errno));
+		}
+		usleep(10000); /* 10ms */
 	}
 
 	if (ioctl(fb_fd, FBIOGET_VSCREENINFO, &fb_var) < 0) {
-		fprintf(stderr, "OSGLUFB: Failed to get framebuffer info: %s\n",
+		log_printf("OSGLUFB: Failed to get framebuffer info: %s\n",
 			strerror(errno));
 		close(fb_fd);
 		fb_fd = -1;
@@ -151,7 +166,7 @@ GLOBALOSGLUFUNC blnr fb_init(void)
 	}
 
 	if (ioctl(fb_fd, FBIOGET_FSCREENINFO, &fb_fix) < 0) {
-		fprintf(stderr, "OSGLUFB: Failed to get fix info: %s\n",
+		log_printf("OSGLUFB: Failed to get fix info: %s\n",
 			strerror(errno));
 		close(fb_fd);
 		fb_fd = -1;
@@ -166,7 +181,7 @@ GLOBALOSGLUFUNC blnr fb_init(void)
 		MAP_SHARED, fb_fd, 0);
 	if (fb_buffer == (ui3p)MAP_FAILED) {
 		fb_buffer = NULL;
-		fprintf(stderr, "OSGLUFB: Failed to mmap framebuffer: %s\n",
+		log_printf("OSGLUFB: Failed to mmap framebuffer: %s\n",
 			strerror(errno));
 		close(fb_fd);
 		fb_fd = -1;
@@ -206,7 +221,7 @@ LOCALPROC fb_test_render(void)
 	}
 
 	/* Clear screen */
-	fprintf(stderr, "fb_test_render called\n");
+	log_printf("fb_test_render called\n");
 	printf("\033[2J\033[H");
 	printf("\n");
 	printf("Test mode - Press Ctrl+C to exit\n");
@@ -328,13 +343,6 @@ LOCALPROC fb_draw_to_buffer(void)
 		return;
 	}
 
-	/* Fill background with fill color if enabled */
-	if (g_fill_enabled) {
-		fb_fill_with_color(g_fill_color);
-	} else {
-		memset(fb_buffer, 0x00, fb_fix.line_length * fb_height);
-	}
-
 #if 0 != vMacScreenDepth
 	if (UseColorMode && ColorModeWorks) {
 		ui3b *clut_r = (ui3b *)CLUT_reds;
@@ -413,6 +421,31 @@ LOCALPROC fb_draw_to_buffer(void)
 		} else {
 			dst_x0 = g_offset_x;
 			dst_y0 = g_offset_y;
+		}
+
+		/* Fill background with fill color if enabled, only when layout changes */
+		if (fb_first_draw
+			|| (fb_layout_offset_x != g_offset_x)
+			|| (fb_layout_offset_y != g_offset_y)
+			|| (fb_layout_scaled_w != scaled_width)
+			|| (fb_layout_scaled_h != scaled_height)
+			|| (fb_layout_center != center_no_scale)
+			|| (fb_layout_fill_enabled != g_fill_enabled)
+			|| (fb_layout_fill_color != g_fill_color))
+		{
+			if (g_fill_enabled) {
+				fb_fill_with_color(g_fill_color);
+			} else {
+				memset(fb_buffer, 0x00, fb_fix.line_length * fb_height);
+			}
+			fb_first_draw = falseblnr;
+			fb_layout_offset_x = g_offset_x;
+			fb_layout_offset_y = g_offset_y;
+			fb_layout_scaled_w = scaled_width;
+			fb_layout_scaled_h = scaled_height;
+			fb_layout_center = center_no_scale;
+			fb_layout_fill_enabled = g_fill_enabled;
+			fb_layout_fill_color = g_fill_color;
 		}
 
 		switch (fb_bps) {
@@ -597,6 +630,7 @@ LOCALPROC fb_draw_to_buffer(void)
 
 GLOBALOSGLUPROC fb_draw(void)
 {
+
 	fb_draw_to_buffer();
 
 	if (g_test_mode) {

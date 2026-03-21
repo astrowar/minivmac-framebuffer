@@ -54,13 +54,13 @@ make
 
  use fill to adjust the scale , offset-x offset_y.
 
-
+<img src="IMG_20260320_200731596_HDR.jpg" alt="alt text" width="25%" />
 
 ## Requirements
 
 - Linux with framebuffer support (`/dev/fb0`)
 - GCC compiler
- 
+
 
 ## License
 

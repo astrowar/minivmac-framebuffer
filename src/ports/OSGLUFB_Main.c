@@ -15,7 +15,7 @@
 /* Hook para quando o Mac reinicia/shutdown */
 GLOBALOSGLUPROC OnMacShutdown(void)
 {
-	fprintf(stderr, "\n=== MAC SHUTDOWN/RESET DETECTED ===\n");
+	log_printf("\n=== MAC SHUTDOWN/RESET DETECTED ===\n");
 }
 
 char *d_arg = NULL;
@@ -92,7 +92,7 @@ LOCALFUNC blnr AllocMyMemory(void)
 	n = ReserveAllocOffset;
 	ReserveAllocBigBlock = (ui3p)calloc(1, n);
 	if (NULL == ReserveAllocBigBlock) {
-		fprintf(stderr, "OSGLUFB: Out of memory allocating %lu bytes\n",
+		log_printf("OSGLUFB: Out of memory allocating %lu bytes\n",
 			(unsigned long)n);
 	} else {
 		ReserveAllocOffset = 0;
@@ -111,6 +111,11 @@ LOCALPROC UnallocMyMemory(void)
 		free((char *)ReserveAllocBigBlock);
 		ReserveAllocBigBlock = nullpr;
 	}
+}
+
+LOCALPROC log_error(const char *msg)
+{
+	log_printf("OSGLUFB: %s\n", msg);
 }
 
 /* Forward declarations from other modules */
@@ -178,7 +183,7 @@ GLOBALOSGLUFUNC blnr OSGLUFB_PostMouseButton(blnr down)
 
 GLOBALOSGLUPROC WarnMsgUnsupportedDisk(void)
 {
-	fprintf(stderr, "OSGLUFB: Unsupported disk\n");
+	log_printf("OSGLUFB: Unsupported disk\n");
 }
 
 GLOBALOSGLUFUNC blnr ExtraTimeNotOver(void)
@@ -210,9 +215,9 @@ GLOBALOSGLUPROC DoneWithDrawingForTick(void)
 				fb_draw();
 			}
 			if (fb_dump_snapshot(test_snapshot_path)) {
-				fprintf(stderr, "OSGLUFB: Test snapshot written to %s\n", test_snapshot_path);
+				log_printf("OSGLUFB: Test snapshot written to %s\n", test_snapshot_path);
 			} else {
-				fprintf(stderr, "OSGLUFB: Failed to write test snapshot %s\n", test_snapshot_path);
+				log_printf("OSGLUFB: Failed to write test snapshot %s\n", test_snapshot_path);
 			}
 			test_snapshot_done = trueblnr;
 			ForceMacOff = trueblnr;
@@ -290,18 +295,18 @@ EXPORTOSGLUFUNC tMacErr HTCEimport(tPbuf *r)
 
 LOCALPROC Usage(void)
 {
-	fprintf(stderr, "Usage: minivmac [options] [rom] [disk]\n");
-	fprintf(stderr, "Options:\n");
-	fprintf(stderr, "  -r rom        Specify ROM file\n");
-	fprintf(stderr, "  -d dir        Specify disk directory\n");
-	fprintf(stderr, "  --skip n      Skip n frames between draws\n");
-	fprintf(stderr, "  --rotate deg  Rotate output (0, 90, 180, 270)\n");
-	fprintf(stderr, "  --scale f     Scale factor (e.g., 1.15)\n");
-	fprintf(stderr, "  --offset-x n  Horizontal offset in pixels (positive = right)\n");
-	fprintf(stderr, "  --offset-y n  Vertical offset in pixels (positive = down)\n");
-	fprintf(stderr, "  --fill        Fill area outside emulated screen with color (default: red)\n");
-	fprintf(stderr, "  -h            Show this help\n");
-	fprintf(stderr, "  --test        Run in test mode\n");
+	log_printf("Usage: minivmac [options] [rom] [disk]\n");
+	log_printf("Options:\n");
+	log_printf("  -r rom        Specify ROM file\n");
+	log_printf("  -d dir        Specify disk directory\n");
+	log_printf("  --skip n      Skip n frames between draws\n");
+	log_printf("  --rotate deg  Rotate output (0, 90, 180, 270)\n");
+	log_printf("  --scale f     Scale factor (e.g., 1.15)\n");
+	log_printf("  --offset-x n  Horizontal offset in pixels (positive = right)\n");
+	log_printf("  --offset-y n  Vertical offset in pixels (positive = down)\n");
+	log_printf("  --fill        Fill area outside emulated screen with color (default: red)\n");
+	log_printf("  -h            Show this help\n");
+	log_printf("  --test        Run in test mode\n");
 }
 
 /* --- Main entry point --- */
@@ -309,6 +314,9 @@ LOCALPROC Usage(void)
 int main(int argc, char *argv[])
 {
 	int i;
+
+	/* Initialize logging to both stderr and log file */
+	log_init(NULL);
 
 	for (i = 1; i < argc; i++) {
 		if (argv[i][0] == '-') {
@@ -329,7 +337,7 @@ int main(int argc, char *argv[])
 				if ((errno != 0) || (endp == argv[i]) || (*endp != '\0')
 					|| (parsed < 0) || (parsed > INT_MAX))
 				{
-					fprintf(stderr, "OSGLUFB: invalid --skip value: %s\n", argv[i]);
+					log_printf("OSGLUFB: invalid --skip value: %s\n", argv[i]);
 					Usage();
 					return 1;
 				}
@@ -348,7 +356,7 @@ int main(int argc, char *argv[])
 				errno = 0;
 				parsed = strtol(argv[i], &endp, 10);
 				if ((errno != 0) || (endp == argv[i]) || (*endp != '\0')) {
-					fprintf(stderr, "OSGLUFB: invalid --rotate value: %s\n", argv[i]);
+					log_printf("OSGLUFB: invalid --rotate value: %s\n", argv[i]);
 					Usage();
 					return 1;
 				}
@@ -381,13 +389,13 @@ int main(int argc, char *argv[])
 				errno = 0;
 				parsed = strtod(argv[i], &endp);
 				if ((errno != 0) || (endp == argv[i]) || (*endp != '\0')) {
-					fprintf(stderr, "OSGLUFB: invalid --scale value: %s\n", argv[i]);
+					log_printf("OSGLUFB: invalid --scale value: %s\n", argv[i]);
 					Usage();
 					return 1;
 				}
 
 				if (parsed <= 0.0) {
-					fprintf(stderr, "OSGLUFB: --scale must be positive\n");
+					log_printf("OSGLUFB: --scale must be positive\n");
 					Usage();
 					return 1;
 				}
@@ -406,7 +414,7 @@ int main(int argc, char *argv[])
 				errno = 0;
 				parsed = strtol(argv[i], &endp, 10);
 				if ((errno != 0) || (endp == argv[i]) || (*endp != '\0')) {
-					fprintf(stderr, "OSGLUFB: invalid --offset-x value: %s\n", argv[i]);
+					log_printf("OSGLUFB: invalid --offset-x value: %s\n", argv[i]);
 					Usage();
 					return 1;
 				}
@@ -425,7 +433,7 @@ int main(int argc, char *argv[])
 				errno = 0;
 				parsed = strtol(argv[i], &endp, 10);
 				if ((errno != 0) || (endp == argv[i]) || (*endp != '\0')) {
-					fprintf(stderr, "OSGLUFB: invalid --offset-y value: %s\n", argv[i]);
+					log_printf("OSGLUFB: invalid --offset-y value: %s\n", argv[i]);
 					Usage();
 					return 1;
 				}
@@ -449,7 +457,7 @@ int main(int argc, char *argv[])
 				}
 				long color = strtol(argv[i], NULL, 0);
 				if (color < 0 || color > 0xFFFFFFFF) {
-					fprintf(stderr, "OSGLUFB: invalid fill color: %s\n", argv[i]);
+					log_printf("OSGLUFB: invalid fill color: %s\n", argv[i]);
 					Usage();
 					return 1;
 				}
@@ -489,12 +497,12 @@ int main(int argc, char *argv[])
 	}
 
 	if (!fb_init()) {
-		fprintf(stderr, "OSGLUFB: Framebuffer initialization failed\n");
+		log_printf("OSGLUFB: Framebuffer initialization failed\n");
 		return 1;
 	}
 
 	if (!AllocMyMemory()) {
-		fprintf(stderr, "OSGLUFB: Memory allocation failed\n");
+		log_printf("OSGLUFB: Memory allocation failed\n");
 		fb_shutdown();
 		return 1;
 	}
@@ -504,7 +512,7 @@ int main(int argc, char *argv[])
 	test_start_usec = GetNowUsec();
 
 	if (!LoadMacRom()) {
-		fprintf(stderr, "OSGLUFB: Failed to load ROM\n");
+		log_printf("OSGLUFB: Failed to load ROM\n");
 		restore_kbd();
 		fb_shutdown();
 		UnallocMyMemory();
@@ -524,6 +532,8 @@ int main(int argc, char *argv[])
 	restore_kbd();
 	fb_shutdown();
 	UnallocMyMemory();
+
+	log_close();
 
 	return 0;
 }

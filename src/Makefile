@@ -12,6 +12,7 @@ OSGLU_SRCS = \
 	ports/OSGLUFB_Input.c \
 	ports/OSGLUFB_Drives.c \
 	ports/OSGLUFB_Main.c \
+	ports/OSGLUFB_Logging.c \
 	event_reader/input_reader.c
 
 OSGLU_BLDS = \
@@ -20,6 +21,7 @@ OSGLU_BLDS = \
 	bld/OSGLUFB_Input.o \
 	bld/OSGLUFB_Drives.o \
 	bld/OSGLUFB_Main.o \
+	bld/OSGLUFB_Logging.o \
 	bld/input_reader.o
 
 X11_LIBS =
@@ -42,6 +44,9 @@ bld/OSGLUFB_Drives.o : ports/OSGLUFB_Drives.c ports/OSGLUFB_Common.h
 
 bld/OSGLUFB_Main.o : ports/OSGLUFB_Main.c ports/OSGLUFB_Common.h
 	gcc -c "ports/OSGLUFB_Main.c" -o "bld/OSGLUFB_Main.o" $(mk_COptionsOSGLU)
+
+bld/OSGLUFB_Logging.o : ports/OSGLUFB_Logging.c ports/OSGLUFB_Common.h
+	gcc -c "ports/OSGLUFB_Logging.c" -o "bld/OSGLUFB_Logging.o" $(mk_COptionsOSGLU)
 
 bld/input_reader.o : event_reader/input_reader.c event_reader/input_reader.h
 	gcc -c "event_reader/input_reader.c" -o "bld/input_reader.o" $(mk_COptionsOSGLU)

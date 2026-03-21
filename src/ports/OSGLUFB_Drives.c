@@ -49,10 +49,10 @@ LOCALPROC MacMsg(char *briefMsg, char *longMsg, blnr fatal)
 {
 	(void)fatal;
 	if (NULL != briefMsg) {
-		fprintf(stderr, "%s\n", briefMsg);
+		log_printf("%s\n", briefMsg);
 	}
 	if (NULL != longMsg) {
-		fprintf(stderr, "%s\n", longMsg);
+		log_printf("%s\n", longMsg);
 	}
 }
 

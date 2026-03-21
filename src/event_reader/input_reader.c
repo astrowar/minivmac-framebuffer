@@ -8,6 +8,7 @@
 #include <dirent.h>
 #include <sys/select.h>
 #include <linux/input.h>
+#include "OSGLUFB_Common.h"
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wformat-truncation"
@@ -21,19 +22,35 @@ int input_reader_init(input_reader_t *reader) {
 
     memset(reader, 0, sizeof(input_reader_t));
 
-    /* Check if we can access /dev/input */
+    /* Check if we can access /dev/input/event0 */
     int test_fd = open("/dev/input/event0", O_RDONLY);
     if (test_fd < 0) {
-        fprintf(stderr, "\n");
-        fprintf(stderr, "ERROR: Cannot access /dev/input/event0\n");
-        fprintf(stderr, "The current user does not have permission to access input devices.\n");
-        fprintf(stderr, "\n");
-        fprintf(stderr, "To fix this, add your user to the 'input' group:\n");
-        fprintf(stderr, "    sudo usermod -aG input $USER\n");
-        fprintf(stderr, "\n");
-        fprintf(stderr, "Then log out and log back in (or reboot) for the changes to take effect.\n");
-        fprintf(stderr, "\n");
-        return -1;
+        if (errno == ENOENT) {
+            /* File does not exist */
+            log_printf("\n");
+            log_printf("ERROR: /dev/input/event0 does not exist\n");
+            log_printf("Input devices are not available on this system.\n");
+            log_printf("\n");
+            return -1;
+        } else if (errno == EACCES) {
+            /* Permission denied - user is not in the input group */
+            log_printf("\n");
+            log_printf("ERROR: Permission denied accessing /dev/input/event0\n");
+            log_printf("The current user does not have permission to access input devices.\n");
+            log_printf("\n");
+            log_printf("To fix this, add your user to the 'input' group:\n");
+            log_printf("    sudo usermod -aG input %s\n", getenv("USER") ? getenv("USER") : "your_user");
+            log_printf("\n");
+            log_printf("Then log out and log back in (or reboot) for the changes to take effect.\n");
+            log_printf("\n");
+            return -1;
+        } else {
+            /* Other error */
+            log_printf("\n");
+            log_printf("ERROR: Cannot access /dev/input/event0: %s\n", strerror(errno));
+            log_printf("\n");
+            return -1;
+        }
     }
     close(test_fd);
 
